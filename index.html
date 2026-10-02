@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Quadball Team Map</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css" />
+<style>
+  :root{
+    --ink:#1a2b23;
+    --paper:#f5f2ea;
+    --field-dark:#1f4a37;
+    --college:#2f6b4f;
+    --club:#c96a3b;
+  }
+  html,body{margin:0;padding:0;height:100%;font-family:'Helvetica Neue',Arial,sans-serif;background:var(--paper);color:var(--ink);}
+  #app{display:flex;flex-direction:column;height:100vh;}
+
+  header{
+    padding:12px 20px;
+    background:var(--field-dark);
+    color:var(--paper);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:10px;
+    border-bottom:3px solid var(--club);
+  }
+  header h1{font-size:1.05rem;margin:0;font-weight:600;}
+  header .count{font-size:0.78rem;opacity:0.8;margin-top:2px;}
+
+  .toggle{display:flex;border:1.5px solid var(--paper);border-radius:999px;overflow:hidden;font-size:0.82rem;}
+  .toggle button{border:none;background:transparent;color:var(--paper);padding:7px 16px;cursor:pointer;}
+  .toggle button.active{background:var(--club);color:#fff;}
+  .toggle button:not(.active):hover{background:#ffffff22;}
+
+  #map{flex:1;}
+
+  .team-pin{
+    width:30px;height:30px;border-radius:50%;background:#fff;
+    display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:0.6rem;color:#fff;
+    box-shadow:0 1px 4px rgba(0,0,0,0.35);
+  }
+  .team-pin.college{background:var(--college);border:2px solid #16352670;}
+  .team-pin.club{background:var(--club);border:2px solid #7a3e2170;}
+
+  .popup-title{font-weight:700;font-size:0.92rem;margin-bottom:3px;}
+  .popup-meta{font-size:0.78rem;color:#555;line-height:1.4;}
+  .popup-tag{display:inline-block;margin-top:4px;padding:2px 8px;border-radius:999px;font-size:0.68rem;font-weight:700;color:#fff;}
+  .popup-tag.college{background:var(--college);}
+  .popup-tag.club{background:var(--club);}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div>
+      <h1>Quadball Team Map</h1>
+      <div class="count" id="count"></div>
+    </div>
+    <div class="toggle" id="toggle">
+      <button data-filter="all" class="active">All</button>
+      <button data-filter="college">College</button>
+      <button data-filter="club">Club</button>
+    </div>
+  </header>
+  <div id="map"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
+<script>
+  // ---- TEAM DATA (converted from Test_Map.xlsx) ----
+  // Once you have logo images hosted somewhere public, set LOGO_BASE_URL below
+  // to that folder's URL and each marker will automatically use the image
+  // instead of initials (matched by the 'logoFile' field on each team).
+  const LOGO_BASE_URL = "https://taraboyd-usq.github.io/USQ-team-map/logos/"; // e.g. "https://yoursite.com/team-logos/"
+
+  const teams = [{"name": "Mile High QC", "type": "club", "region": "West", "city": "Denver", "state": "CO", "lat": 39.760189, "lng": -104.996553, "official": true, "logoFile": "mile high logo.png", "contactEmail": null}, {"name": "Boom Train", "type": "club", "region": "Midwest/Great Lakes", "city": "Chicago", "state": "IL", "lat": 41.88531, "lng": -87.62213, "official": true, "logoFile": "Boom train logo.png", "contactEmail": null}, {"name": "Chicago Windchill", "type": "club", "region": "Midwest/Great Lakes", "city": "Chicago", "state": "IL", "lat": 41.88531, "lng": -87.62213, "official": true, "logoFile": "Chicago Windchill.png", "contactEmail": null}, {"name": "Chicago United", "type": "club", "region": "Midwest/Great Lakes", "city": "Chicago", "state": "IL", "lat": 41.88531, "lng": -87.62213, "official": true, "logoFile": "chicago united logo.png", "contactEmail": null}, {"name": "Ohio Apollos", "type": "club", "region": "Midwest/Great Lakes", "city": "Columbus?", "state": "OH", "lat": 40.100924, "lng": -83.013402, "official": true, "logoFile": "Apollos Refresh_V5_2 - Logo.png", "contactEmail": null}, {"name": "Reign QC", "type": "club", "region": "Midwest/Great Lakes", "city": "Omaha", "state": "NE", "lat": 41.262003, "lng": -95.933564, "official": true, "logoFile": "Reign Logo.png", "contactEmail": "cryandavis12@gmail.com"}, {"name": "Trainwreck", "type": "club", "region": "Midwest/Great Lakes", "city": "Chicago", "state": "IL", "lat": 41.88531, "lng": -87.62213, "official": true, "logoFile": "Trainwreck logo.png", "contactEmail": null}, {"name": "Atlantic Dragons", "type": "club", "region": "Northeast/Mid-Atlantic", "city": "Brooklyn", "state": "NY", "lat": 40.694481, "lng": -73.989319, "official": true, "logoFile": "Atlantic dragons logo.png", "contactEmail": null}, {"name": "Boston Lobsters", "type": "club", "region": "Northeast/Mid-Atlantic", "city": "Medford", "state": "MA", "lat": 42.422095, "lng": -71.109297, "official": true, "logoFile": "Lobsters Logo.jpg", "contactEmail": null}, {"name": "Boston Mussels", "type": "club", "region": "Northeast/Mid-Atlantic", "city": "Medford", "state": "MA", "lat": 42.422095, "lng": -71.109297, "official": true, "logoFile": "Mussels Logo.jpg", "contactEmail": null}, {"name": "Boston Red Pandas", "type": "club", "region": "Northeast/Mid-Atlantic", "city": "Cambridge", "state": "MA", "lat": 42.380442, "lng": -71.132947, "official": true, "logoFile": "Boston red pandas logo.png", "contactEmail": null}, {"name": "Carolina Reapers", "type": "club", "region": "Northeast/Mid-Atlantic", "city": "Charlotte", "state": "NC", "lat": 35.26002, "lng": -80.804151, "official": true, "logoFile": "reapers logo.png", "contactEmail": null}, {"name": "DCQC", "type": "club", "region": "Northeast/Mid-Atlantic", "city": "Washington, DC", "state": null, "lat": 38.911936, "lng": -77.016719, "official": true, "logoFile": "DCQC.png", "contactEmail": "rachelw_22@yahoo.com"}, {"name": "New Jersey Dice", "type": "club", "region": "Northeast/Mid-Atlantic", "city": "Secaucaus", "state": "NJ", "lat": 40.78885, "lng": -74.056035, "official": true, "logoFile": "NJ dice logo.png", "contactEmail": null}, {"name": "New York River Runners", "type": "club", "region": "Northeast/Mid-Atlantic", "city": "Troy", "state": "NY", "lat": 42.748588, "lng": -73.599536, "official": true, "logoFile": "NY River runners logo.jpg", "contactEmail": null}, {"name": "New York Slice", "type": "club", "region": "Northeast/Mid-Atlantic", "city": "New York City", "state": "NY", "lat": 40.750422, "lng": -73.996328, "official": true, "logoFile": "NY slice logo.png", "contactEmail": null}, {"name": "Pennsylvania Wolves", "type": "club", "region": "Northeast/Mid-Atlantic", "city": "Philadelphia", "state": "PA", "lat": 40.001811, "lng": -75.11787, "official": true, "logoFile": "PA wolves logo.png", "contactEmail": null}, {"name": "QC Pittsburgh", "type": "club", "region": "Northeast/Mid-Atlantic", "city": "Pittsburgh", "state": "PA", "lat": 40.47441, "lng": -79.950968, "official": true, "logoFile": "Pitt logo.png", "contactEmail": null}, {"name": "Vermont United", "type": "club", "region": "Northeast/Mid-Atlantic", "city": "Burlington", "state": "VT", "lat": 44.476622, "lng": -73.209998, "official": true, "logoFile": "VT united logo.jpg", "contactEmail": null}, {"name": "Washington Monuments", "type": "club", "region": "Northeast/Mid-Atlantic", "city": "Arlington", "state": "VA", "lat": 38.88, "lng": -77.1, "official": true, "logoFile": "WSH monuments logo.jpg", "contactEmail": null}, {"name": "Orlando Quad ball", "type": "club", "region": "South", "city": "Orlando", "state": "FL", "lat": 28.545179, "lng": -81.373291, "official": true, "logoFile": "orlando logo.png", "contactEmail": null}, {"name": "Houston Cosmos", "type": "club", "region": "Southwest", "city": "Houston", "state": "TX", "lat": 29.813142, "lng": -95.309789, "official": true, "logoFile": "houston cosmos logo.png", "contactEmail": null}, {"name": "Texas Hill Country Heat", "type": "club", "region": "Southwest", "city": "Round Rock", "state": "TX", "lat": 30.501747, "lng": -97.647206, "official": true, "logoFile": "Texas Hill Country Heat logo.png", "contactEmail": null}, {"name": "Lost Boys", "type": "club", "region": "West", "city": "Los Angeles", "state": "CA", "lat": 33.973951, "lng": -118.248405, "official": true, "logoFile": "Lost boys logo.png", "contactEmail": null}, {"name": "Second Stars", "type": "club", "region": "West", "city": "Los Angeles", "state": "CA", "lat": 33.973951, "lng": -118.248405, "official": true, "logoFile": "second stars logo.png", "contactEmail": null}, {"name": "Silicon Valley Vipers", "type": "club", "region": "West", "city": "Mountain View", "state": "CA", "lat": 37.189396, "lng": -121.705327, "official": true, "logoFile": "silicon valley vipers logo.png", "contactEmail": null}, {"name": "Bay Area Bakers", "type": "club", "region": "West", "city": "San Jose", "state": "CA", "lat": 37.346608, "lng": -121.909871, "official": true, "logoFile": "bakers logo.png", "contactEmail": null}, {"name": "Seattle Sirens", "type": "club", "region": "West", "city": "Seattle", "state": "WA", "lat": 47.610902, "lng": -122.336422, "official": true, "logoFile": "seattle sirens logo.png", "contactEmail": null}, {"name": "Bay Area Breakers", "type": "club", "region": "West", "city": "Hayward", "state": "CA", "lat": 37.673946, "lng": -122.08482, "official": true, "logoFile": "breakers logo.png", "contactEmail": "hanali_d_gaeuman@berkeley.edu"}, {"name": "Brew Cities Quadball Club", "type": "club", "region": "Midwest/Great Lakes", "city": "Milwaukee", "state": "WI", "lat": 43.016982, "lng": -88.037354, "official": true, "logoFile": "Brew Cities.png", "contactEmail": "majeske@umich.edu"}, {"name": "Chaos QC", "type": "club", "region": "Midwest/Great Lakes", "city": "Bettendorf", "state": "IA", "lat": 41.52448, "lng": -90.51569, "official": true, "logoFile": "CHAOS logo.jpeg", "contactEmail": "calebtmd@gmail.com"}, {"name": "Philadelphia Flamingos (Philadelphia Freedom Quad ball Club)", "type": "club", "region": "Northeast/Mid-Atlantic", "city": "Philadelphia", "state": "PA", "lat": 40.001811, "lng": -75.11787, "official": true, "logoFile": "Philly freedom flamingos logo.jpg", "contactEmail": null}, {"name": "Sea Serpents", "type": "club", "region": "Midwest/Great Lakes", "city": "Ashland", "state": "WI", "lat": 46.59, "lng": -90.88, "official": false, "logoFile": "SeaSerpent Logo.jpg", "contactEmail": null}, {"name": "Ball State Cardinals", "type": "college", "region": "Midwest/Great Lakes", "city": "Muncie", "state": "IN", "lat": 40.142124, "lng": -85.389874, "official": true, "logoFile": "Ball State Cardinals logo.png", "contactEmail": null}, {"name": "Blue Jay QC", "type": "college", "region": "Midwest/Great Lakes", "city": "Omaha", "state": "NE", "lat": 41.262003, "lng": -95.933564, "official": true, "logoFile": "Blue Jay logo.png", "contactEmail": null}, {"name": "Bowling Green State Quad ball", "type": "college", "region": "Midwest/Great Lakes", "city": "Bowling Green", "state": "OH", "lat": 41.376449, "lng": -83.613714, "official": true, "logoFile": "Bowling green logo.png", "contactEmail": null}, {"name": "Creighton QC", "type": "college", "region": "Midwest/Great Lakes", "city": "Omaha", "state": "NE", "lat": 41.262003, "lng": -95.933564, "official": true, "logoFile": "CreightonQuadballLogoFinal.png", "contactEmail": null}, {"name": "CWRUcio Quad ball", "type": "college", "region": "Midwest/Great Lakes", "city": "Cleveland", "state": "OH", "lat": 41.489381, "lng": -81.667486, "official": true, "logoFile": "CWRUcio logo.png", "contactEmail": null}, {"name": "Illini Ridgebacks", "type": "college", "region": "Midwest/Great Lakes", "city": "Urbana", "state": "IL", "lat": 40.108966, "lng": -88.211024, "official": true, "logoFile": "Illini logo.png", "contactEmail": null}, {"name": "Boston University", "type": "college", "region": "Northeast/Mid-Atlantic", "city": "Boston", "state": "MA", "lat": 42.354318, "lng": -71.073449, "official": true, "logoFile": "Boston Uni logo.png", "contactEmail": null}, {"name": "Brandeis", "type": "college", "region": "Northeast/Mid-Atlantic", "city": "Waltham", "state": "MA", "lat": 42.388938, "lng": -71.2398, "official": true, "logoFile": "brandeis logo.png", "contactEmail": null}, {"name": "Brown Bears", "type": "college", "region": "Northeast/Mid-Atlantic", "city": "Providence", "state": "RI", "lat": 41.81835, "lng": -71.424851, "official": true, "logoFile": "Brown bears logo.png", "contactEmail": null}, {"name": "Emerson College", "type": "college", "region": "Northeast/Mid-Atlantic", "city": "Boston", "state": "MA", "lat": 42.354318, "lng": -71.073449, "official": true, "logoFile": "Emerson logo.png", "contactEmail": null}, {"name": "Harvard Horntails", "type": "college", "region": "Northeast/Mid-Atlantic", "city": "Boston", "state": "MA", "lat": 42.354318, "lng": -71.073449, "official": true, "logoFile": "Harvard logo.png", "contactEmail": null}, {"name": "JMU", "type": "college", "region": "Northeast/Mid-Atlantic", "city": "Harrisonburg", "state": "VA", "lat": 38.422777, "lng": -78.877137, "official": true, "logoFile": "JMU logo.png", "contactEmail": null}, {"name": "Middlebury", "type": "college", "region": "Northeast/Mid-Atlantic", "city": "Middlebury", "state": "VT", "lat": 43.991942, "lng": -73.171578, "official": true, "logoFile": "Middlebury logo.png", "contactEmail": null}, {"name": "RPI", "type": "college", "region": "Northeast/Mid-Atlantic", "city": "Troy", "state": "NY", "lat": 42.748588, "lng": -73.599536, "official": true, "logoFile": "RPI logo.png", "contactEmail": null}, {"name": "Rutgers University Quad ball", "type": "college", "region": "Northeast/Mid-Atlantic", "city": "New Brunswick", "state": "NJ", "lat": 40.486754, "lng": -74.444395, "official": true, "logoFile": "Rutgers logo.png", "contactEmail": null}, {"name": "UNC Chapel Hill", "type": "college", "region": "Northeast/Mid-Atlantic", "city": "Chapel Hill", "state": "NC", "lat": 36.004647, "lng": -79.054475, "official": true, "logoFile": "UNC logo.png", "contactEmail": null}, {"name": "University of Vermont Quad ball", "type": "college", "region": "Northeast/Mid-Atlantic", "city": "Burlington", "state": "VT", "lat": 44.476622, "lng": -73.209998, "official": true, "logoFile": "Vermont Logo.png", "contactEmail": null}, {"name": "Virginia Quadball Club", "type": "college", "region": "Northeast/Mid-Atlantic", "city": "Charlottesville", "state": "VA", "lat": 38.026588, "lng": -78.48045, "official": true, "logoFile": "UVA logo.jpg", "contactEmail": "joeybeh25@gmail.com"}, {"name": "Texas State Quadball", "type": "college", "region": "Southwest", "city": "San Marcos", "state": "TX", "lat": 29.972907, "lng": -97.997166, "official": true, "logoFile": "Texas State logo.jpg", "contactEmail": "samuelregardia23@gmail.com"}, {"name": "Marquette Golden Eagles", "type": "college", "region": "Midwest/Great Lakes", "city": "Milwaukee", "state": "WI", "lat": 43.043213, "lng": -87.894734, "official": true, "logoFile": "Marquette logo.png", "contactEmail": null}, {"name": "Michigan Quad ball Team", "type": "college", "region": "Midwest/Great Lakes", "city": "Ann Arbor", "state": "MI", "lat": 42.266638, "lng": -83.849042, "official": true, "logoFile": "Michigan logo.png", "contactEmail": null}, {"name": "Minnesota Quad ball", "type": "college", "region": "Midwest/Great Lakes", "city": "Minneapolis", "state": "MN", "lat": 44.984577, "lng": -93.269097, "official": true, "logoFile": "Minnesota quadball logo.png", "contactEmail": null}, {"name": "Mizzou", "type": "college", "region": "Midwest/Great Lakes", "city": "Columbio", "state": "MO", "lat": 38.894165, "lng": -92.274145, "official": true, "logoFile": "Mizzou Logo.png", "contactEmail": null}, {"name": "Purdue", "type": "college", "region": "Midwest/Great Lakes", "city": "West Lafayette", "state": "IN", "lat": 40.467303, "lng": -86.928132, "official": true, "logoFile": "Purdue Logo.png", "contactEmail": null}, {"name": "QC Pittsburgh", "type": "college", "region": "Northeast/Mid-Atlantic", "city": "Pittsburgh", "state": "PA", "lat": 40.47441, "lng": -79.950968, "official": true, "logoFile": "Pitt logo.png", "contactEmail": null}, {"name": "SHSU", "type": "college", "region": "Southwest", "city": "Huntsville", "state": "TX", "lat": 30.846986, "lng": -95.597029, "official": true, "logoFile": "SHSU logo.png", "contactEmail": null}, {"name": "Texas A&M", "type": "college", "region": "Southwest", "city": "College Station", "state": "TX", "lat": 30.609093, "lng": -96.325984, "official": true, "logoFile": "Texas AM logo.jpg", "contactEmail": null}, {"name": "Texas Quad ball", "type": "college", "region": "Southwest", "city": "Austin", "state": "TX", "lat": 30.268335, "lng": -97.741382, "official": true, "logoFile": "Texas Quadball Logo.jpg", "contactEmail": null}, {"name": "UCLA", "type": "college", "region": "West", "city": "Los Angeles", "state": "CA", "lat": 33.973951, "lng": -118.248405, "official": true, "logoFile": "UCLA logo.png", "contactEmail": null}, {"name": "UTSA", "type": "college", "region": "Southwest", "city": "San Antonio", "state": "TX", "lat": 29.468413, "lng": -98.528889, "official": true, "logoFile": "UTSA logo.jpeg", "contactEmail": null}];
+
+  function initials(name){
+    const words = name.match(/[A-Za-z0-9]+/g) || [];
+    if(words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+    return name.slice(0,2).toUpperCase();
+  }
+
+  const map = L.map('map').setView([39.5, -98.35], 4.3);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OpenStreetMap &copy; CARTO',
+    subdomains: 'abcd',
+    maxZoom: 19
+  }).addTo(map);
+
+  function makeIcon(team){
+    if(LOGO_BASE_URL && team.logoFile){
+      const url = LOGO_BASE_URL + encodeURIComponent(team.logoFile);
+      return L.divIcon({
+        className: '',
+        html: `<div class="team-pin ${team.type}" style="padding:2px;"><img src="${url}" style="width:100%;height:100%;object-fit:contain;border-radius:50%;background:#fff;" onerror="this.parentElement.innerText='${initials(team.name)}';this.remove();"/></div>`,
+        iconSize: [30,30], iconAnchor: [15,15], popupAnchor: [0,-15]
+      });
+    }
+    return L.divIcon({
+      className: '',
+      html: `<div class="team-pin ${team.type}">${initials(team.name)}</div>`,
+      iconSize: [30,30], iconAnchor: [15,15], popupAnchor: [0,-15]
+    });
+  }
+
+  let clusterGroup = L.markerClusterGroup({ maxClusterRadius: 40 });
+  map.addLayer(clusterGroup);
+
+  function popupHtml(t){
+    return `<div class="popup-title">${t.name}</div>
+      <div class="popup-meta">${t.city || ''}${t.state ? ', ' + t.state : ''}${t.region ? ' · ' + t.region : ''}</div>
+      <span class="popup-tag ${t.type}">${t.type === 'college' ? 'College' : 'Club'}</span>`;
+  }
+
+  function render(filter){
+    clusterGroup.clearLayers();
+    const shown = teams.filter(t => filter === 'all' || t.type === filter);
+    shown.forEach(t => {
+      const m = L.marker([t.lat, t.lng], { icon: makeIcon(t) }).bindPopup(popupHtml(t));
+      clusterGroup.addLayer(m);
+    });
+    document.getElementById('count').textContent = `${shown.length} teams shown`;
+  }
+
+  render('all');
+
+  document.getElementById('toggle').addEventListener('click', (e) => {
+    if(e.target.tagName !== 'BUTTON') return;
+    document.querySelectorAll('#toggle button').forEach(b => b.classList.remove('active'));
+    e.target.classList.add('active');
+    render(e.target.dataset.filter);
+  });
+</script>
+</body>
+</html>
