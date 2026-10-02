@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Team Map</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+<style>
+  :root{
+    --ink:#1a2b23;
+    --paper:#f5f2ea;
+    --field:#2f6b4f;
+    --field-dark:#1f4a37;
+    --line:#2f6b4f22;
+    --accent:#c96a3b;
+  }
+  html,body{margin:0;padding:0;height:100%;font-family:'Georgia',serif;background:var(--paper);color:var(--ink);}
+  #app{display:flex;flex-direction:column;height:100vh;}
+
+  header{
+    padding:14px 20px;
+    background:var(--field-dark);
+    color:var(--paper);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:10px;
+    border-bottom:3px solid var(--accent);
+  }
+  header h1{
+    font-size:1.15rem;
+    margin:0;
+    font-weight:400;
+    letter-spacing:0.3px;
+  }
+  header h1 b{font-weight:700;}
+
+  .toggle{
+    display:flex;
+    border:1.5px solid var(--paper);
+    border-radius:999px;
+    overflow:hidden;
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-size:0.82rem;
+  }
+  .toggle button{
+    border:none;
+    background:transparent;
+    color:var(--paper);
+    padding:7px 16px;
+    cursor:pointer;
+    transition:background 0.15s ease;
+  }
+  .toggle button.active{
+    background:var(--accent);
+    color:#fff;
+  }
+  .toggle button:not(.active):hover{
+    background:#ffffff22;
+  }
+
+  #map{flex:1;}
+
+  .team-pin{
+    width:36px;height:36px;border-radius:50%;
+    background:#fff;
+    border:2.5px solid var(--accent);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-weight:700;font-size:0.68rem;color:var(--field-dark);
+    box-shadow:0 1px 4px rgba(0,0,0,0.35);
+  }
+  .team-pin.club{border-color:var(--field);}
+
+  .leaflet-popup-content-wrapper{
+    border-radius:6px;
+    font-family:'Helvetica Neue',Arial,sans-serif;
+  }
+  .popup-title{font-weight:700;font-size:0.95rem;margin-bottom:2px;}
+  .popup-meta{font-size:0.78rem;color:#555;}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1><b>Team</b> Map — sample data</h1>
+    <div class="toggle" id="toggle">
+      <button data-filter="all" class="active">All</button>
+      <button data-filter="college">College</button>
+      <button data-filter="club">Club</button>
+    </div>
+  </header>
+  <div id="map"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+  // ---- SAMPLE DATA — replace this array with your real team list ----
+  const teams = [
+    { name: "Duke Blue Devils", type: "college", city: "Durham, NC", lat: 35.994, lng: -78.899, initials: "DU" },
+    { name: "UCLA Bruins", type: "college", city: "Los Angeles, CA", lat: 34.069, lng: -118.445, initials: "UC" },
+    { name: "Michigan Wolverines", type: "college", city: "Ann Arbor, MI", lat: 42.278, lng: -83.738, initials: "MI" },
+    { name: "Texas Longhorns", type: "college", city: "Austin, TX", lat: 30.284, lng: -97.732, initials: "TX" },
+    { name: "Florida Gators", type: "college", city: "Gainesville, FL", lat: 29.648, lng: -82.349, initials: "FL" },
+    { name: "Seattle Surge FC", type: "club", city: "Seattle, WA", lat: 47.608, lng: -122.335, initials: "SE" },
+    { name: "Denver Thunder Club", type: "club", city: "Denver, CO", lat: 39.739, lng: -104.99, initials: "DE" },
+    { name: "Chicago Metro United", type: "club", city: "Chicago, IL", lat: 41.878, lng: -87.63, initials: "CH" },
+    { name: "Atlanta Rush Club", type: "club", city: "Atlanta, GA", lat: 33.749, lng: -84.388, initials: "AT" },
+    { name: "Boston Harbor Club", type: "club", city: "Boston, MA", lat: 42.36, lng: -71.058, initials: "BO" }
+  ];
+
+  const map = L.map('map', { zoomControl: true }).setView([39.5, -98.35], 4.4);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OpenStreetMap &copy; CARTO',
+    subdomains: 'abcd',
+    maxZoom: 19
+  }).addTo(map);
+
+  function makeIcon(team){
+    return L.divIcon({
+      className: '',
+      html: `<div class="team-pin ${team.type}">${team.initials}</div>`,
+      iconSize: [36, 36],
+      iconAnchor: [18, 18],
+      popupAnchor: [0, -18]
+    });
+  }
+
+  let markers = [];
+
+  function renderMarkers(filter){
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+    teams
+      .filter(t => filter === 'all' || t.type === filter)
+      .forEach(t => {
+        const marker = L.marker([t.lat, t.lng], { icon: makeIcon(t) })
+          .bindPopup(`<div class="popup-title">${t.name}</div><div class="popup-meta">${t.type === 'college' ? 'College team' : 'Club team'} · ${t.city}</div>`);
+        marker.addTo(map);
+        markers.push(marker);
+      });
+  }
+
+  renderMarkers('all');
+
+  document.getElementById('toggle').addEventListener('click', (e) => {
+    if(e.target.tagName !== 'BUTTON') return;
+    document.querySelectorAll('#toggle button').forEach(b => b.classList.remove('active'));
+    e.target.classList.add('active');
+    renderMarkers(e.target.dataset.filter);
+  });
+</script>
+</body>
+</html>
